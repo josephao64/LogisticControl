@@ -9,9 +9,17 @@ if (!admin.apps.length) {
       projectId: process.env.GCLOUD_PROJECT || "demo-logistic-control",
     });
   } else {
-    const credential = process.env.FIREBASE_SERVICE_ACCOUNT
-      ? admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT))
-      : admin.credential.applicationDefault();
+    const fs = require("fs");
+    const path = require("path");
+    const keyPath = path.resolve(__dirname, "../serviceAccountKey.json");
+    let credential;
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+      credential = admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT));
+    } else if (fs.existsSync(keyPath)) {
+      credential = admin.credential.cert(require(keyPath));
+    } else {
+      credential = admin.credential.applicationDefault();
+    }
     admin.initializeApp({ credential });
   }
 }
