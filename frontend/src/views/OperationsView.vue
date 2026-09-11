@@ -174,7 +174,7 @@ async function download(order) {
   <div class="orders-grid" :class="{'list-view':view==='list'}">
    <article v-for="p in requests" :key="p.id" class="order-card" :class="{selected:selected.includes(p.id)}">
     <div class="order-top"><span class="icon-tile"><AppIcon :name="p.node==='BODEGA'?'warehouse':'store'"/></span><StatusBadge :status="p.status"/></div>
-    <div class="order-main"><h2>{{ p.branchName }}</h2><p>{{ p.supplierName }}</p><p class="order-reference">{{ p.id }}</p></div>
+    <div class="order-main"><h2>{{ p.branchName }}</h2><p>{{ p.supplierName }}</p><p class="order-reference">Ref: {{ p.id ? p.id.slice(0, 8).toUpperCase() : '' }}</p></div>
     <div class="order-meta"><span><AppIcon name="calendar" :size="15"/>{{ new Date(p.createdAt).toLocaleDateString('es-GT') }}</span><span>{{ label(p.node) }}</span></div>
     <div class="order-preview">{{ p.items.slice(0,2).map(l=>l.name).join(' · ') }}<span v-if="p.items.length>2"> y {{ p.items.length-2 }} más</span></div>
     <div class="order-summary"><span>{{ p.items.length }} productos</span><strong>{{ money(p.total) }}</strong></div>

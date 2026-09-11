@@ -37,12 +37,12 @@ class PedidoService {
     pedidoData.items.forEach(item => {
       // Use the item provider if available, else lookup, else the one passed in pedidoData
       const prodInfo = productosMap[item.sku];
-      let provId = item.id_proveedor || item.proveedor_id || 
-                   (prodInfo ? (prodInfo.id_proveedor || prodInfo.proveedor_id) : null) || 
-                   pedidoData.id_proveedor || pedidoData.proveedor_id || 'PROV_DESCONOCIDO';
-      
+      let provId = item.id_proveedor || item.proveedor_id ||
+        (prodInfo ? (prodInfo.id_proveedor || prodInfo.proveedor_id) : null) ||
+        pedidoData.id_proveedor || pedidoData.proveedor_id || 'PROV_DESCONOCIDO';
+
       const cantidadSolicitada = Number(item.cantidad_solicitada) || 0;
-      
+
       // ONLY INCLUDE ITEMS THAT ARE ACTUALLY REQUESTED
       if (cantidadSolicitada > 0) {
         if (!grupos[provId]) {
@@ -54,7 +54,7 @@ class PedidoService {
             total_calculado: 0
           };
         }
-        
+
         const precioUnitario = prodInfo ? prodInfo.precio_unitario : 0;
         const subtotal = cantidadSolicitada * (precioUnitario || 0);
         grupos[provId].total_calculado += subtotal;
@@ -141,7 +141,7 @@ class PedidoService {
         ...actualizacion,
         ultima_actualizacion: new Date().toISOString()
       });
-      
+
       const docActualizado = await pedidoRef.get();
       const pedidoCompletado = { id, ...docActualizado.data() };
 

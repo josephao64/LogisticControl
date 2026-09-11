@@ -312,7 +312,7 @@ const eliminarPedido = async (id) => {
           <ul v-else-if="!pedidoEnRecepcionTienda" class="space-y-4">
             <li v-for="pedido in pedidoStore.pedidos" :key="pedido.id" class="p-5 bg-white hover:bg-slate-50 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-colors">
               <div>
-                <h3 class="font-bold text-slate-800">Pedido <span class="text-sm text-slate-500 font-mono">#{{ pedido.id }}</span></h3>
+                <h3 class="font-bold text-slate-800">Pedido <span class="text-sm text-slate-500 font-mono">#{{ pedido.id ? pedido.id.slice(0, 8).toUpperCase() : '' }}</span></h3>
                 <p class="text-sm text-slate-500 mb-1">{{ new Date(pedido.fecha).toLocaleString() }}</p>
                 <div class="flex items-center gap-2 mb-1 flex-wrap">
                   <span class="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md uppercase tracking-wider">Prov: {{ suministrosStore.proveedores.find(p => p.id === (pedido.id_proveedor || pedido.proveedor_id))?.nombre || pedido.proveedor_nombre || pedido.id_proveedor || pedido.proveedor_id || 'N/A' }}</span>
@@ -358,7 +358,7 @@ const eliminarPedido = async (id) => {
               <button @click="cancelarRecepcionTienda" class="text-slate-500 hover:text-slate-700 font-semibold mb-4 flex items-center gap-2">
                 <span>&larr;</span> Volver a Lista
               </button>
-              <h3 class="text-xl font-bold text-slate-800">Conciliación de Ingreso a Tienda - Pedido #{{ pedidoEnRecepcionTienda.id }}</h3>
+              <h3 class="text-xl font-bold text-slate-800">Conciliación de Ingreso a Tienda - Pedido #{{ pedidoEnRecepcionTienda.id ? pedidoEnRecepcionTienda.id.slice(0, 8).toUpperCase() : '' }}</h3>
             </div>
             
             <div v-if="pedidoEnRecepcionTienda.guia" class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
