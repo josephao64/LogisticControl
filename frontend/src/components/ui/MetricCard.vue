@@ -1,0 +1,2 @@
+<script setup>defineProps({title:String,value:[Number,String],hint:String,icon:{type:String,default:'chart'},tone:{type:String,default:'teal'},percent:Number});</script>
+<template><article class="metric-card" :class="tone"><div class="metric-top"><span>{{title}}</span><span class="metric-icon"><AppIcon :name="icon"/></span></div><strong>{{value}}</strong><div v-if="percent!==undefined&&percent!==null" class="meter"><span :style="{width:Math.max(0,Math.min(100,percent))+'%'}"></span></div><p v-if="hint">{{hint}}</p></article></template>

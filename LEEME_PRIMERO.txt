@@ -1,0 +1,27 @@
+LOGISTIC CONTROL - SISTEMA COMPLETO ACTUALIZADO
+
+El frontend ya incluye la configuración pública del proyecto Firebase original db-logistica.
+
+PASOS
+1. Instale Node.js 22.
+2. Extraiga TODO el ZIP.
+3. Ejecute INSTALAR_WINDOWS.bat.
+4. Configure únicamente las credenciales privadas del backend en backend/.env.
+5. Habilite correo/contraseña en Firebase Authentication y cree su primera cuenta.
+6. Desde backend ejecute: node scripts/bootstrap-admin.js UID_DE_SU_CUENTA
+7. Ejecute INICIAR_WINDOWS.bat y abra http://localhost:5173.
+8. Configure grupos, empresas, sucursales, proveedores, productos, stock ideal y calendarios.
+9. En Administración / Usuarios cree las demás cuentas con correo, contraseña, rol y sedes.
+
+NOVEDADES
+Interfaz adaptable a PC y móvil, iconos, tarjetas de pedidos, filtros, formularios y conteo con progreso.
+Administración de usuarios y catálogos con validación y auditoría.
+Consulte docs/interfaz-y-administracion.md.
+
+Se requiere configurar la API para entrar y trabajar. Para acceso móvil remoto utilice un dominio HTTPS.
+La compilación y 29 pruebas locales pasaron; falta validar Firebase real y dispositivos.
+
+Si usará otro Firebase, copie frontend/.env.example a frontend/.env y complete sus propios valores.
+Lea README.md y docs/activacion-y-datos-existentes.md antes de utilizar datos reales.
+No incluye credenciales privadas, contraseñas, node_modules ni datos reales.
+Versión: interfaz responsive y administración integrada. No se publicó en GitHub ni en producción.

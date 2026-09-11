@@ -1,0 +1,2 @@
+<script setup>defineProps({title:String,description:String,eyebrow:String,icon:{type:String,default:'grid'}});</script>
+<template><header class="page-heading"><div><div class="eyebrow"><AppIcon :name="icon" :size="15"/>{{eyebrow||'Logistic Control'}}</div><h1>{{title}}</h1><p v-if="description">{{description}}</p></div><div v-if="$slots.default" class="heading-actions"><slot/></div></header></template>

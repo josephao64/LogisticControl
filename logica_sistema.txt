@@ -1,0 +1,60 @@
+=============================================================
+LÓGICA DEL SISTEMA LOGISTIC CONTROL - VERSIÓN ACTUALIZADA
+=============================================================
+El sistema está diseñado como una plataforma integral de logística y pedidos, con capacidades multi-tenant (multi-empresa) y reglas estrictas de validación. La aplicación se divide en Frontend (Vue 3 + Vite + Tailwind + Pinia) y Backend (Node.js + Express + Firebase), integrando servicios como Cloudinary para la gestión de medios.
+
+1. MÓDULO DE AJUSTES Y CONFIGURACIÓN GLOBAL
+-------------------------------------------------------------
+Configuración de Sistema: Permite personalizar el nombre del sistema y el logo (texto corto o URL). Esta configuración se almacena a través de Pinia (configStore) en el localStorage y actualiza dinámicamente la barra lateral (App.vue) en toda la aplicación sin necesidad de recargar.
+
+2. ESTRUCTURA CORPORATIVA (TENANT)
+-------------------------------------------------------------
+Define la jerarquía organizacional del negocio, permitiendo la operación multi-tenant.
+Niveles: Grupos Corporativos -> Empresas (Razón Social) -> Sucursales (Tiendas).
+
+Reglas de Inserción (Backend):
+- Mayúsculas Automáticas: Todo texto ingresado se convierte a MAYÚSCULAS antes de guardarse en Firebase para mantener consistencia en la base de datos.
+- Cero Duplicados: Al intentar guardar un Grupo, Empresa o Sucursal, el sistema consulta en Firebase si el nombre exacto ya existe. Si existe, la operación es rechazada para prevenir duplicados.
+
+3. SUMINISTROS
+-------------------------------------------------------------
+Define los catálogos base reales que alimentan las auditorías y pedidos de las tiendas.
+- Proveedores: Entidades exactas registradas en el sistema que surten los productos. Tienen un "Nodo de Entrega" definido (BODEGA o DIRECTO_TIENDA).
+- Insumos (Productos): Artículos enlazados obligatoriamente y de forma dinámica a su respectivo Proveedor en la base de datos. Contienen parámetros de stock mínimo y promedio de uso semanal.
+- Reglas de Inserción (Backend): Validaciones anti-duplicidad y forzado de MAYÚSCULAS para mantener la integridad relacional cuando se generen las órdenes.
+
+4. TIENDA (AUDITORÍA Y PEDIDOS)
+-------------------------------------------------------------
+El origen de los datos de consumo. La tienda revisa inventario físico y genera la necesidad utilizando un flujo automatizado de Sugerencia Inteligente.
+- Realizar Pedido (Auditoría Única): La tienda genera un pedido. El sistema compara el inventario físico actual contra el stock ideal/consumos para generar la sugerencia exacta de pedido.
+- Vinculación Dinámica: Los ítems solicitados heredan y se vinculan automáticamente con los Insumos y Proveedores reales creados en el módulo de Suministros. No hay datos en duro ni de ejemplo; todo pedido jala la información relacional de Firebase.
+- Agrupación: Cada pedido queda registrado con su respectiva Razón Social (Empresa) y Sucursal. Los ítems se almacenan con el estado inicial "PENDIENTE".
+
+5. OPERACIONES Y LOGÍSTICA (REVISIÓN Y EXPORTACIÓN)
+-------------------------------------------------------------
+El motor de revisión, consolidación y aprobación de las requisiciones.
+- Aprobación Logística: Filtro global o específico por "Empresa" (Razón Social).
+- Generación de Vouchers (PDF): Detalle tabular por sucursal utilizando jspdf-autotable.
+- Exportación Consolidada por Proveedor (CRÍTICO): Sistema de extracción global que agrupa las requisiciones de todas las sucursales, filtradas exclusivamente por un único Proveedor. Genera una constancia maestra (imagen o PDF consolidado) que sirve como orden de compra. Esta constancia detalla el total exacto de insumos que el proveedor debe surtir y el desglose de cómo se distribuye esa carga entre las distintas sucursales.
+- Aprobación: Transiciona el pedido de PENDIENTE a TOMADO_POR_PROVEEDOR.
+
+6. RECEPCIÓN Y CONCILIACIÓN (NUEVO MÓDULO)
+-------------------------------------------------------------
+Módulo especializado para el ingreso físico de la mercadería, control de facturación y cruce de datos para mitigar el error humano.
+
+Recibe Bodega (Para insumos con nodo BODEGA):
+- Registro de Facturación: Al momento de recibir, el operario de bodega está obligado a ingresar el número de Factura del Pedido correspondiente al proveedor que está entregando.
+- Validación de Cantidades (Auditoría de Ingreso): Interfaz de cruce donde se ingresa la Cantidad Recibida físicamente y el sistema la compara en tiempo real contra la Cantidad Pedida original. Generación de métricas o alertas en caso de discrepancias (faltantes/sobrantes) para medir el cumplimiento del proveedor.
+
+Recibe Tienda (Para insumos con nodo DIRECTO_TIENDA o traslados internos):
+- Interfaz de recepción final en la sucursal.
+- Confirmación de que los productos despachados (ya sea por el proveedor directo o enviados desde la bodega central) ingresaron físicamente al inventario local de la tienda.
+
+7. MÁQUINA DE ESTADOS ACTUALIZADA
+-------------------------------------------------------------
+El ciclo de vida del pedido o de los ítems fraccionados:
+- [PENDIENTE]: Generado por la tienda. Esperando revisión por Logística.
+- [TOMADO_POR_PROVEEDOR]: Logística aprobó y generó la constancia consolidada por proveedor. El proveedor está preparando el despacho.
+- [EN_TRANSITO_DIRECTO] / [EN_TRANSITO_BODEGA]: Estado de ruta dependiendo del nodo de entrega del proveedor.
+- [RECIBIDO_BODEGA]: Ingreso a la bodega central. Factura del proveedor registrada y conciliación de (Cantidad Pedida vs Cantidad Recibida) ejecutada exitosamente.
+- [CONCILIADO]: El estado final. El inventario físico recibido es comprobado y aceptado en el nodo final de destino (Tienda).
