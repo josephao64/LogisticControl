@@ -524,6 +524,9 @@ function createLogistics(repo, now = () => new Date()) {
           new Set(data.lines.map((l) => l.itemId)).size === p.items.length,
           "Complete todas las líneas recibidas, incluyendo ceros.",
         );
+        const invoices = (await tx.list("invoices")).filter(
+          (i) => i.requestId === id,
+        );
         const rawInvoice =
           typeof data.invoiceNumber === "string"
             ? data.invoiceNumber
@@ -532,15 +535,6 @@ function createLogistics(repo, now = () => new Date()) {
                 .toUpperCase()
                 .replace(/\s+/g, " ")
             : "";
-        const storeInvoiceNumber = final
-          ? required(rawInvoice, "número de factura recibida en tienda")
-              .normalize("NFKC")
-              .toUpperCase()
-              .replace(/\s+/g, " ")
-          : "";
-        const invoices = (await tx.list("invoices")).filter(
-          (i) => i.requestId === id,
-        );
         let autoInvoiceDoc = null;
         let existingAutoInv = null;
         if (invoices.length === 0 && rawInvoice) {
@@ -573,6 +567,14 @@ function createLogistics(repo, now = () => new Date()) {
             invoices.push(existingAutoInv || autoInvoiceDoc);
           }
         }
+        const effectiveInvoice =
+          rawInvoice || (invoices.length > 0 ? invoices[0].number : "");
+        const storeInvoiceNumber = final
+          ? required(effectiveInvoice, "número de factura recibida en tienda")
+              .normalize("NFKC")
+              .toUpperCase()
+              .replace(/\s+/g, " ")
+          : "";
         fail(
           invoices.length > 0,
           "Ingrese el número de factura antes de recibir.",

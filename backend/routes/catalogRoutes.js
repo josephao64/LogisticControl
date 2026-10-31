@@ -43,7 +43,7 @@ async function remove(req, collection, id) {
     for (const [child, field, label] of dependents[collection] || []) {
       const rows = await tx.list(child);
       const n = rows.filter((x) => x[field] === id).length;
-      fail(!n, `No se puede eliminar: tiene ${n} ${label} asociados. Elimínelos o reasígnelos primero.`, 409);
+      fail(!n, `No se puede eliminar: tiene ${n} ${label} asociados. Elimínelos o reasígnelos primero.`, 400);
     }
     tx.remove(collection, id);
     tx.set("auditEvents", randomUUID(), {

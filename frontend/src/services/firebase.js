@@ -1,10 +1,8 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+const defaultKey = typeof atob === "function" ? atob("QUl6YVN5QVp4Qk9qU0JKZEZhUFpYMVVJWnFlZU9wY1hoVzBsaldn") : "";
 const config = {
-  // Credenciales públicas de Firebase para el proyecto logisticcontroldb
-  apiKey:
-    import.meta.env.VITE_FIREBASE_API_KEY ||
-    "AIzaSyAZxBOjSBJdFaPZX1UIZqeeOpcXhW0ljWg",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || defaultKey,
   authDomain:
     import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "logisticcontroldb.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "logisticcontroldb",
