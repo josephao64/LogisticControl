@@ -10,7 +10,8 @@ const origins = (process.env.CORS_ORIGINS || "http://localhost:5173").split(
 );
 app.use(
   cors({
-    origin: (origin, cb) => cb(null, !origin || origins.includes(origin)),
+    origin: (origin, cb) =>
+      cb(null, !origin || origins.includes("*") || origins.includes(origin)),
   }),
 );
 app.use(express.json({ limit: "1mb" }));
