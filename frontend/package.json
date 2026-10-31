@@ -10,21 +10,20 @@
     "test": "node --test src/domain/*.test.js"
   },
   "dependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "autoprefixer": "^10.4.19",
     "axios": "^1.6.8",
     "firebase": "^12.19.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
-    "logistic-control": "file:..",
     "pinia": "^2.1.7",
+    "postcss": "^8.4.38",
     "sweetalert2": "^11.26.24",
+    "tailwindcss": "^3.4.3",
+    "vite": "^5.2.0",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^5.0.4",
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.38",
-    "tailwindcss": "^3.4.3",
-    "vite": "^5.2.0"
   }
 }
