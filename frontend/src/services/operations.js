@@ -16,6 +16,22 @@ http.interceptors.request.use(async (config) => {
     config.headers.Authorization = `Bearer ${await auth.currentUser.getIdToken()}`;
   return config;
 });
+export async function fetchPublicUsers() {
+  const { data } = await http.get("/public-users");
+  return data.users || [];
+}
+export async function removeUser(id) {
+  await http.delete(`/operacion/users/${id}`);
+  await refresh();
+}
+export async function removeRequest(id) {
+  await http.delete(`/operacion/requests/${id}`);
+  await refresh();
+}
+export async function removePurchaseOrder(id) {
+  await http.delete(`/operacion/purchase-orders/${id}`);
+  await refresh();
+}
 export async function refresh() {
   const { data } = await http.get("/operacion/snapshot");
   state.data = data.data;
@@ -64,4 +80,22 @@ export const money = (n) =>
   new Intl.NumberFormat("es-GT", { style: "currency", currency: "GTQ" }).format(
     n || 0,
   );
-export const label = (s) => String(s || "").replaceAll("_", " ");
+export const statusLabels = {
+  PENDIENTE: "Por revisar",
+  APROBADO: "Aprobado",
+  ESPERANDO_BODEGA: "Tomado por proveedor (OC generada)",
+  ESPERANDO_TIENDA: "Tomado por proveedor (OC generada)",
+  RECIBIDO_BODEGA: "En bodega",
+  EN_CAMINO_TIENDA: "En camino a tienda",
+  CONCILIADO: "En tienda (Recibido)",
+  COMPLETADO: "En tienda (Recibido)",
+  RECHAZADO: "Rechazado",
+  DIFERENCIA_BODEGA: "Diferencia en bodega",
+  DIFERENCIA_TIENDA: "Diferencia en tienda",
+  BODEGA: "Bodega",
+  DIRECTO_TIENDA: "Directo a tienda",
+  EMITIDA: "OC Emitida",
+  ENVIADO: "Enviado",
+};
+
+export const label = (s) => statusLabels[s] || String(s || "").replaceAll("_", " ");

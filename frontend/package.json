@@ -14,6 +14,7 @@
     "firebase": "^12.19.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
+    "logistic-control": "file:..",
     "pinia": "^2.1.7",
     "sweetalert2": "^11.26.24",
     "vue": "^3.4.21",

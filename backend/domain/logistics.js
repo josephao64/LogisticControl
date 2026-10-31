@@ -11,12 +11,12 @@ const fail = (condition, message, status) => {
 const qty = (value) => {
   fail(
     value !== "" &&
-      value !== null &&
-      value !== undefined &&
-      ["number", "string"].includes(typeof value) &&
-      String(value).trim() !== "" &&
-      Number.isFinite(Number(value)) &&
-      Number(value) >= 0,
+    value !== null &&
+    value !== undefined &&
+    ["number", "string"].includes(typeof value) &&
+    String(value).trim() !== "" &&
+    Number.isFinite(Number(value)) &&
+    Number(value) >= 0,
     "Complete todas las cantidades con números mayores o iguales a cero.",
   );
   return Number(value);
@@ -34,8 +34,9 @@ const scope = (user, branch) => {
   fail(branch, "Sucursal no encontrada.", 404);
   fail(
     user.role === "Administrador" ||
-      ((user.branchIds || []).includes(branch.id) &&
-        (user.companyIds || []).includes(branch.id_empresa)),
+    (user.role === "Bodega" && user.allBranches === true) ||
+    ((user.branchIds || []).includes(branch.id) &&
+      (user.companyIds || []).includes(branch.id_empresa)),
     "Sucursal fuera de su alcance.",
     403,
   );
@@ -290,8 +291,8 @@ function createLogistics(repo, now = () => new Date()) {
         fail(p.status === "PENDIENTE", "La solicitud ya fue revisada.", 409);
         fail(
           Array.isArray(data.lines) &&
-            data.lines.length === p.items.length &&
-            new Set(data.lines.map((l) => l.itemId)).size === p.items.length,
+          data.lines.length === p.items.length &&
+          new Set(data.lines.map((l) => l.itemId)).size === p.items.length,
           "Revise todas las líneas.",
         );
         const items = p.items.map((l) => {
@@ -349,8 +350,8 @@ function createLogistics(repo, now = () => new Date()) {
       return execute(user, requestId, "ORDEN_COMPRA", async (tx, at, audit) => {
         fail(
           Array.isArray(data.requestIds) &&
-            data.requestIds.length > 0 &&
-            new Set(data.requestIds).size === data.requestIds.length,
+          data.requestIds.length > 0 &&
+          new Set(data.requestIds).size === data.requestIds.length,
           "Seleccione solicitudes distintas.",
         );
         const ps = await Promise.all(
@@ -371,7 +372,7 @@ function createLogistics(repo, now = () => new Date()) {
         );
         fail(
           Number.isFinite(Date.parse(expectedAt)) &&
-            Date.parse(expectedAt) >= Date.parse(at),
+          Date.parse(expectedAt) >= Date.parse(at),
           "Fecha de compromiso inválida.",
         );
         const id = randomUUID(),
@@ -419,10 +420,10 @@ function createLogistics(repo, now = () => new Date()) {
         const p = await orderFor(tx, user, id);
         fail(
           p.purchaseOrderId &&
-            (p.node === "BODEGA"
-              ? ["ESPERANDO_BODEGA", "DIFERENCIA_BODEGA"]
-              : ["ESPERANDO_TIENDA", "DIFERENCIA_TIENDA"]
-            ).includes(p.status),
+          (p.node === "BODEGA"
+            ? ["ESPERANDO_BODEGA", "DIFERENCIA_BODEGA"]
+            : ["ESPERANDO_TIENDA", "DIFERENCIA_TIENDA"]
+          ).includes(p.status),
           "El pedido no admite facturas.",
           409,
         );
@@ -438,16 +439,16 @@ function createLogistics(repo, now = () => new Date()) {
           .normalize("NFKC")
           .toUpperCase()
           .replace(/\s+/g, " ");
-        const invoiceKey = key(p.companyId, p.supplierId, number);
+        const invoiceKey = key(p.companyId, p.supplierId, id, number);
         fail(
           !(await tx.get("invoices", invoiceKey)),
-          "La factura ya está registrada para esta empresa y proveedor.",
+          "La factura ya está registrada en este pedido.",
           409,
         );
         fail(
           Array.isArray(data.lines) &&
-            data.lines.length > 0 &&
-            new Set(data.lines.map((l) => l.itemId)).size === data.lines.length,
+          data.lines.length > 0 &&
+          new Set(data.lines.map((l) => l.itemId)).size === data.lines.length,
           "Incluya productos distintos en la factura.",
         );
         const prior = (await tx.list("invoices")).filter(
@@ -503,10 +504,10 @@ function createLogistics(repo, now = () => new Date()) {
         fail(
           final
             ? [
-                "ESPERANDO_TIENDA",
-                "EN_CAMINO_TIENDA",
-                "DIFERENCIA_TIENDA",
-              ].includes(p.status)
+              "ESPERANDO_TIENDA",
+              "EN_CAMINO_TIENDA",
+              "DIFERENCIA_TIENDA",
+            ].includes(p.status)
             : ["ESPERANDO_BODEGA", "DIFERENCIA_BODEGA"].includes(p.status),
           "Estado incompatible con la recepción.",
           409,
@@ -519,14 +520,63 @@ function createLogistics(repo, now = () => new Date()) {
           );
         fail(
           Array.isArray(data.lines) &&
-            data.lines.length === p.items.length &&
-            new Set(data.lines.map((l) => l.itemId)).size === p.items.length,
+          data.lines.length === p.items.length &&
+          new Set(data.lines.map((l) => l.itemId)).size === p.items.length,
           "Complete todas las líneas recibidas, incluyendo ceros.",
         );
+        const rawInvoice =
+          typeof data.invoiceNumber === "string"
+            ? data.invoiceNumber
+                .trim()
+                .normalize("NFKC")
+                .toUpperCase()
+                .replace(/\s+/g, " ")
+            : "";
+        const storeInvoiceNumber = final
+          ? required(rawInvoice, "número de factura recibida en tienda")
+              .normalize("NFKC")
+              .toUpperCase()
+              .replace(/\s+/g, " ")
+          : "";
         const invoices = (await tx.list("invoices")).filter(
           (i) => i.requestId === id,
         );
-        fail(invoices.length > 0, "Registre las facturas antes de recibir.");
+        let autoInvoiceDoc = null;
+        let existingAutoInv = null;
+        if (invoices.length === 0 && rawInvoice) {
+          const autoInvoiceKey = key(p.companyId, p.supplierId, id, rawInvoice);
+          existingAutoInv = await tx.get("invoices", autoInvoiceKey);
+          const autoLines = p.items
+            .filter((i) => qty(i.approvedQty) > 0)
+            .map((i) => ({
+              itemId: i.itemId,
+              name: i.name,
+              quantity: qty(i.approvedQty),
+              unitPrice: qty(i.unitPrice),
+            }));
+          if (autoLines.length > 0) {
+            autoInvoiceDoc = {
+              invoiceKey: autoInvoiceKey,
+              requestId: id,
+              purchaseOrderId: p.purchaseOrderId,
+              branchId: p.branchId,
+              companyId: p.companyId,
+              supplierId: p.supplierId,
+              number: rawInvoice,
+              lines: autoLines,
+              total: round(
+                autoLines.reduce((s, l) => s + l.quantity * l.unitPrice, 0),
+              ),
+              at,
+              actorId: user.uid,
+            };
+            invoices.push(existingAutoInv || autoInvoiceDoc);
+          }
+        }
+        fail(
+          invoices.length > 0,
+          "Ingrese el número de factura antes de recibir.",
+        );
         const lines = p.items.map((item) => {
           const input = data.lines.find((l) => l.itemId === item.itemId);
           fail(input, "Falta una cantidad recibida.");
@@ -582,10 +632,14 @@ function createLogistics(repo, now = () => new Date()) {
           ? required(data.evidence, "evidencia de la diferencia")
           : "";
         const receiptId = randomUUID();
+        const recordedInvoiceNumber = final
+          ? storeInvoiceNumber
+          : rawInvoice || invoices.map((i) => i.number).join(", ");
         const receipt = {
           requestId: id,
           branchId: p.branchId,
           stage,
+          invoiceNumber: recordedInvoiceNumber,
           lines,
           hasDifference,
           cause,
@@ -601,6 +655,10 @@ function createLogistics(repo, now = () => new Date()) {
             tx.get("inventoryBalances", key(location, l.itemId)),
           ),
         );
+        if (autoInvoiceDoc && !existingAutoInv) {
+          tx.set("invoices", autoInvoiceDoc.invoiceKey, autoInvoiceDoc);
+          audit("invoices", autoInvoiceDoc.invoiceKey, null, autoInvoiceDoc);
+        }
         tx.set("receipts", receiptId, receipt);
         if (previousAlert) {
           tx.set("alerts", previousAlert.id, {
@@ -653,14 +711,21 @@ function createLogistics(repo, now = () => new Date()) {
           lastReceiptId: receiptId,
           updatedAt: at,
         };
-        if (stage === "BODEGA")
+        if (stage === "BODEGA") {
           next.warehouseReceived = Object.fromEntries(
             lines.map((l) => [l.itemId, l.cumulativeQty]),
           );
+          if (recordedInvoiceNumber)
+            next.bodegaInvoiceNumber = recordedInvoiceNumber;
+        }
         if (final) {
           next.finalReceived = Object.fromEntries(
             lines.map((l) => [l.itemId, l.cumulativeQty]),
           );
+          next.storeInvoiceNumber = storeInvoiceNumber;
+          next.storeInvoices = [
+            ...new Set([...(p.storeInvoices || []), storeInvoiceNumber]),
+          ];
           next.finalReceivedAt = at;
           if (!hasDifference) next.closedAt = at;
         }
@@ -736,7 +801,15 @@ function createLogistics(repo, now = () => new Date()) {
           "Debe recibir y resolver las diferencias antes de despachar.",
           409,
         );
-        const reference = required(data.reference, "referencia del traslado");
+        const transportMethod = String(data.transportMethod || "").trim();
+        const guideNumber = String(data.guideNumber || "").trim();
+        const dispatchNotes = String(data.dispatchNotes || "").trim();
+        const computedRef =
+          data.reference ||
+          (transportMethod && guideNumber
+            ? `${transportMethod} · Guía: ${guideNumber}`
+            : guideNumber);
+        const reference = required(computedRef, "método de transporte y guía");
         const entries = Object.entries(p.warehouseReceived),
           location = `BODEGA:${p.companyId}`;
         const balances = await Promise.all(
@@ -772,6 +845,9 @@ function createLogistics(repo, now = () => new Date()) {
         const next = {
           ...p,
           status: "EN_CAMINO_TIENDA",
+          transportMethod: transportMethod || null,
+          guideNumber: guideNumber || reference,
+          dispatchNotes: dispatchNotes || null,
           dispatchReference: reference,
           dispatchedAt: at,
           dispatchedBy: user.uid,
@@ -804,10 +880,10 @@ function createLogistics(repo, now = () => new Date()) {
             const c = data.calendars?.[supplierId];
             fail(
               c &&
-                Array.isArray(c.days) &&
-                c.days.length > 0 &&
-                c.days.every((d) => Number.isInteger(d) && d >= 0 && d <= 6) &&
-                /^([01]\d|2[0-3]):[0-5]\d$/.test(c.cutoff),
+              Array.isArray(c.days) &&
+              c.days.length > 0 &&
+              c.days.every((d) => Number.isInteger(d) && d >= 0 && d <= 6) &&
+              /^([01]\d|2[0-3]):[0-5]\d$/.test(c.cutoff),
               "Defina días y hora límite para cada proveedor.",
             );
             calendars[supplierId] = {

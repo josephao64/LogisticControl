@@ -53,27 +53,29 @@ router.get(
       ]),
     );
     const admin = req.user.role === "Administrador";
+    const fullScope =
+      admin || (req.user.role === "Bodega" && req.user.allBranches === true);
     const branches = all.sucursales.filter(
       (b) =>
-        admin ||
+        fullScope ||
         ((req.user.branchIds || []).includes(b.id) &&
           (req.user.companyIds || []).includes(b.id_empresa)),
     );
     const branchIds = new Set(branches.map((b) => b.id)),
       companyIds = new Set(branches.map((b) => b.id_empresa));
     all.sucursales = branches;
-    all.empresas = all.empresas.filter((e) => admin || companyIds.has(e.id));
+    all.empresas = all.empresas.filter((e) => fullScope || companyIds.has(e.id));
     all.grupos = all.grupos.filter(
-      (g) => admin || all.empresas.some((e) => e.id_grupo === g.id),
+      (g) => fullScope || all.empresas.some((e) => e.id_grupo === g.id),
     );
     all.productos = all.productos.filter(
       (p) =>
-        admin ||
+        fullScope ||
         !Array.isArray(p.branchIds) ||
         p.branchIds.some((b) => branchIds.has(b)),
     );
     all.proveedores = all.proveedores.filter(
-      (p) => admin || all.productos.some((i) => i.id_proveedor === p.id),
+      (p) => fullScope || all.productos.some((i) => i.id_proveedor === p.id),
     );
     for (const n of [
       "branchSettings",
@@ -84,15 +86,15 @@ router.get(
       "movements",
       "stockProposals",
     ])
-      all[n] = all[n].filter((d) => admin || branchIds.has(d.branchId));
+      all[n] = all[n].filter((d) => fullScope || branchIds.has(d.branchId));
     all.pedidos = all.pedidos.filter(
-      (d) => admin || branchIds.has(d.branchId || d.id_sucursal || d.tienda_id),
+      (d) => fullScope || branchIds.has(d.branchId || d.id_sucursal || d.tienda_id),
     );
     all.purchaseOrders = all.purchaseOrders.filter(
-      (o) => admin || o.branchIds?.every((b) => branchIds.has(b)),
+      (o) => fullScope || o.branchIds?.some((b) => branchIds.has(b)),
     );
     all.auditEvents = all.auditEvents.filter(
-      (e) => admin || (e.branchId && branchIds.has(e.branchId)),
+      (e) => fullScope || (e.branchId && branchIds.has(e.branchId)),
     );
     if (
       !["Administrador", "Logistica", "Gerencia", "Auditoria"].includes(
@@ -158,6 +160,111 @@ for (const [path, method] of Object.entries({
       service[method](req.user, req.params.id, req.body, operationId(req)),
     ),
   );
+router.delete(
+  "/requests/:id",
+  wrap(async (req) => {
+    can(req.user, ["Administrador", "Logistica"]);
+    const id = req.params.id;
+    return repo.transaction(async (tx) => {
+      const pedido = await tx.get("pedidos", id);
+      fail(pedido, "Solicitud no encontrada.", 404);
+
+      // 1. Eliminar facturas vinculadas
+      const invoices = await tx.list("invoices");
+      for (const inv of invoices) {
+        if (inv.requestId === id) tx.remove("invoices", inv.id);
+      }
+
+      // 2. Eliminar recepciones vinculadas
+      const receipts = await tx.list("receipts");
+      for (const rec of receipts) {
+        if (rec.requestId === id) tx.remove("receipts", rec.id);
+      }
+
+      // 3. Eliminar alertas vinculadas
+      const alerts = await tx.list("alerts");
+      for (const alt of alerts) {
+        if (alt.requestId === id) tx.remove("alerts", alt.id);
+      }
+
+      // 4. Eliminar movimientos vinculados
+      const movements = await tx.list("movements");
+      for (const mov of movements) {
+        if (mov.requestId === id) tx.remove("movements", mov.id);
+      }
+
+      // 5. Limpiar u omitir orden de compra vinculada
+      const pos = await tx.list("purchaseOrders");
+      for (const po of pos) {
+        if (po.requestIds && po.requestIds.includes(id)) {
+          const remaining = po.requestIds.filter((rid) => rid !== id);
+          if (remaining.length === 0) {
+            tx.remove("purchaseOrders", po.id);
+          } else {
+            tx.set("purchaseOrders", po.id, {
+              ...po,
+              requestIds: remaining,
+              orders: (po.orders || []).filter((o) => o.requestId !== id),
+            });
+          }
+        }
+      }
+
+      // 6. Eliminar el pedido de Firestore
+      tx.remove("pedidos", id);
+
+      // 7. Auditoría
+      tx.set("auditEvents", randomUUID(), {
+        entityType: "pedidos",
+        entityId: id,
+        action: "ELIMINAR_SOLICITUD",
+        actorId: req.user.uid,
+        before: pedido,
+        after: null,
+        at: new Date().toISOString(),
+      });
+
+      return { id, deleted: true };
+    });
+  }),
+);
+router.delete(
+  "/purchase-orders/:id",
+  wrap(async (req) => {
+    can(req.user, ["Administrador", "Logistica"]);
+    const id = req.params.id;
+    return repo.transaction(async (tx) => {
+      const po = await tx.get("purchaseOrders", id);
+      fail(po, "Orden de compra no encontrada.", 404);
+
+      // Desvincular purchaseOrderId en pedidos
+      const pedidos = await tx.list("pedidos");
+      for (const p of pedidos) {
+        if (p.purchaseOrderId === id || (po.requestIds && po.requestIds.includes(p.id))) {
+          const clean = { ...p };
+          delete clean.purchaseOrderId;
+          tx.set("pedidos", p.id, clean);
+        }
+      }
+
+      // Eliminar orden de compra
+      tx.remove("purchaseOrders", id);
+
+      // Auditoría
+      tx.set("auditEvents", randomUUID(), {
+        entityType: "purchaseOrders",
+        entityId: id,
+        action: "ELIMINAR_ORDEN_COMPRA",
+        actorId: req.user.uid,
+        before: po,
+        after: null,
+        at: new Date().toISOString(),
+      });
+
+      return { id, deleted: true };
+    });
+  }),
+);
 router.post(
   "/system-config",
   wrap(async (req) => {
@@ -190,4 +297,5 @@ router.post(
 const users = require('../domain/users').createUsers(repo, auth);
 router.post('/users', wrap(req => users.create(req.user, req.body, operationId(req))));
 router.post('/users/:id', wrap(req => users.update(req.user, req.params.id, req.body)));
+router.delete('/users/:id', wrap(req => users.remove(req.user, req.params.id)));
 module.exports = router;

@@ -17,6 +17,7 @@ module.exports = {
           delete clean.id;
           writes.push([collection, id, clean]);
         },
+        remove: (collection, id) => writes.push([collection, id, null]),
       };
       const result = await fn(tx);
       // All reads precede all writes; operation receipt and audit commit atomically.
@@ -27,7 +28,11 @@ module.exports = {
         e.status = 400;
         throw e;
       }
-      writes.forEach(([c, id, d]) => native.set(db.collection(c).doc(id), d));
+      writes.forEach(([c, id, d]) =>
+        d === null
+          ? native.delete(db.collection(c).doc(id))
+          : native.set(db.collection(c).doc(id), d),
+      );
       return result;
     }),
 };

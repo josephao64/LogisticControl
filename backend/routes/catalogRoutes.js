@@ -27,8 +27,36 @@ for (const [route, collection] of Object.entries(types)) {
   );
   router.delete(
     `/${route}/:id`,
-    wrap((req) => save(req, collection, req.params.id, true)),
+    wrap((req) => remove(req, collection, req.params.id)),
   );
+}
+const dependents = {
+  grupos: [["empresas", "id_grupo", "empresas"]],
+  empresas: [["sucursales", "id_empresa", "sucursales"]],
+  proveedores: [["productos", "id_proveedor", "productos"]],
+};
+async function remove(req, collection, id) {
+  can(req.user, ["Administrador"]);
+  return repo.transaction(async (tx) => {
+    const before = await tx.get(collection, id);
+    fail(before, "Registro no encontrado.", 404);
+    for (const [child, field, label] of dependents[collection] || []) {
+      const rows = await tx.list(child);
+      const n = rows.filter((x) => x[field] === id).length;
+      fail(!n, `No se puede eliminar: tiene ${n} ${label} asociados. Elimínelos o reasígnelos primero.`, 409);
+    }
+    tx.remove(collection, id);
+    tx.set("auditEvents", randomUUID(), {
+      entityType: collection,
+      entityId: id,
+      action: "ELIMINAR",
+      actorId: req.user.uid,
+      before,
+      after: null,
+      at: new Date().toISOString(),
+    });
+    return { id, deleted: true };
+  });
 }
 async function save(req, collection, id, deactivate = false) {
   can(req.user, ["Administrador"]);
@@ -46,6 +74,7 @@ async function save(req, collection, id, deactivate = false) {
           "nombre",
           "nodo_entrega",
           "nodos_sucursal",
+          "branchIds",
           "dias_credito",
         ],
         productos: [
@@ -121,6 +150,10 @@ async function save(req, collection, id, deactivate = false) {
         fail(data.nodos_sucursal && typeof data.nodos_sucursal === 'object' && !Array.isArray(data.nodos_sucursal), 'Los destinos deben ser un mapa de sucursales.');
         const branches = await tx.list('sucursales');
         fail(Object.keys(data.nodos_sucursal).every(id => branches.some(b => b.id === id)), 'Un destino corresponde a una sucursal inexistente.');
+        if (data.branchIds !== undefined) {
+          fail(Array.isArray(data.branchIds), "Sucursales de proveedor inválidas.");
+          fail(data.branchIds.every(id => branches.some(b => b.id === id)), "Una sucursal asignada no existe.");
+        }
         if (data.dias_credito !== undefined) {
           fail(Number.isInteger(Number(data.dias_credito)) && Number(data.dias_credito) >= 0, 'Días de crédito inválidos.');
           data.dias_credito = Number(data.dias_credito);
